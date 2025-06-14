@@ -4,18 +4,20 @@
     ],
     "processes": [
         {
-            "name": "glxgears",
-            "command": "glxgears",
+            "name": "echoloop",
+            "command": "sh -c 'while true; do echo \"hello\"; sleep 1; done'",
             "working_dir": "/tmp",
             "host": "k9.lan",
-            "autostart": true
+            "autostart": true,
+            "auto_restart": false
         },
         {
-            "name": "run",
-            "command": "sh -c 'sleep 10 && echo \"done\"'",
+            "name": "dateprinter",
+            "command": "sh -c 'while true; do date; sleep 5; done'",
             "working_dir": "/tmp",
             "host": "k9.lan",
-            "autostart": true
+            "autostart": false,
+            "auto_restart": false
         }
     ]
 }

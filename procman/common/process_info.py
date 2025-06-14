@@ -11,6 +11,7 @@ class ProcessInfo:
     command: str
     working_dir: str
     autostart: bool = False
+    auto_restart: bool = False
     pid: Optional[int] = None
     cpu_percent: float = 0.0
     memory_percent: float = 0.0
@@ -29,6 +30,7 @@ class ProcessInfo:
             "command": self.command,
             "working_dir": self.working_dir,
             "autostart": self.autostart,
+            "auto_restart": self.auto_restart,
             "pid": self.pid,
             "cpu_percent": self.cpu_percent,
             "memory_percent": self.memory_percent,
@@ -50,6 +52,7 @@ class ProcessInfo:
             command=data["command"],
             working_dir=data["working_dir"],
             autostart=data.get("autostart", False),
+            auto_restart=data.get("auto_restart", False),
             pid=data.get("pid"),
             cpu_percent=data.get("cpu_percent", 0.0),
             memory_percent=data.get("memory_percent", 0.0),
@@ -60,8 +63,10 @@ class ProcessInfo:
         
         # Add output buffers if present
         if "stdout" in data:
+            proc.stdout_buffer.clear()
             proc.stdout_buffer.extend(data["stdout"])
         if "stderr" in data:
+            proc.stderr_buffer.clear()
             proc.stderr_buffer.extend(data["stderr"])
         proc.last_stdout_pos = data.get("last_stdout_pos", 0)
         proc.last_stderr_pos = data.get("last_stderr_pos", 0)
@@ -72,5 +77,7 @@ class ProcessInfo:
         """Add output to the buffers."""
         if stdout:
             self.stdout_buffer.append(stdout)
+            self.last_stdout_pos += 1
         if stderr:
-            self.stderr_buffer.append(stderr) 
+            self.stderr_buffer.append(stderr)
+            self.last_stderr_pos += 1 

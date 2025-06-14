@@ -51,7 +51,7 @@ class SheriffGUI(QMainWindow):
         
         # Save Config button
         save_config_btn = QPushButton('Save Config')
-        save_config_btn.clicked.connect(self.save_config)
+        save_config_btn.clicked.connect(lambda: self.save_config(force_dialog=True))
         toolbar.addWidget(save_config_btn)
         
         # Add stretch to push buttons to the left
@@ -59,7 +59,7 @@ class SheriffGUI(QMainWindow):
         
         layout.addLayout(toolbar)
         
-        # Create Deputy status group
+        # Create Deputy status group with fixed height
         deputy_group = QGroupBox("Deputy Status")
         deputy_layout = QVBoxLayout()
         
@@ -70,21 +70,23 @@ class SheriffGUI(QMainWindow):
             'Hostname', 'URL', 'Status', 'CPU %', 'Memory %'
         ])
         self.deputy_table.horizontalHeader().setStretchLastSection(True)
+        self.deputy_table.setSizeAdjustPolicy(QTableWidget.AdjustToContents)
         deputy_layout.addWidget(self.deputy_table)
         
         deputy_group.setLayout(deputy_layout)
+        deputy_group.setMaximumHeight(150)  # Limit deputy section height
         layout.addWidget(deputy_group)
         
-        # Create Process status group
+        # Create Process status group that expands
         process_group = QGroupBox("Process Status")
         process_layout = QVBoxLayout()
         
         # Create process table
         self.process_table = QTableWidget()
-        self.process_table.setColumnCount(8)
+        self.process_table.setColumnCount(9)
         self.process_table.setHorizontalHeaderLabels([
             'Name', 'Host', 'Status', 'PID', 'CPU %', 'Memory %',
-            'Uptime', 'Actions'
+            'Uptime', 'Auto-Restart', 'Actions'
         ])
         self.process_table.horizontalHeader().setStretchLastSection(True)
         self.process_table.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -92,7 +94,7 @@ class SheriffGUI(QMainWindow):
         process_layout.addWidget(self.process_table)
         
         process_group.setLayout(process_layout)
-        layout.addWidget(process_group)
+        layout.addWidget(process_group, stretch=1)  # Give process table all remaining space
         
         # Create status bar
         self.statusBar().showMessage('Ready')
@@ -144,10 +146,7 @@ class SheriffGUI(QMainWindow):
         if result == QDialog.Accepted:
             # Update process
             new_info = dialog.get_process_info()
-            # Stop the old process
-            self.sheriff.stop_process(name)
-            # Start with new settings
-            if self.sheriff.start_process(new_info):
+            if self.sheriff.update_process(name, new_info):
                 self.statusBar().showMessage(f'Successfully updated process {name}')
             else:
                 QMessageBox.warning(
@@ -166,12 +165,41 @@ class SheriffGUI(QMainWindow):
     def show_process_context_menu(self, pos):
         """Show context menu for process table."""
         row = self.process_table.rowAt(pos.y())
+        menu = QMenu(self)
+        
         if row >= 0:
+            # Get process name from the first column
             name = self.process_table.item(row, 0).text()
-            menu = QMenu(self)
-            edit_action = menu.addAction("Edit")
+            
+            edit_action = menu.addAction("Edit Process")
             edit_action.triggered.connect(lambda: self.edit_process(name))
-            menu.exec_(self.process_table.viewport().mapToGlobal(pos))
+            
+            delete_action = menu.addAction("Delete Process")
+            delete_action.triggered.connect(lambda: self.delete_process(name))
+        
+        # Always show Add Process option
+        add_action = menu.addAction("Add New Process")
+        add_action.triggered.connect(self.add_process)
+        
+        menu.exec_(self.process_table.viewport().mapToGlobal(pos))
+    
+    def delete_process(self, name: str):
+        """Delete a process."""
+        reply = QMessageBox.question(
+            self, 'Delete Process',
+            f'Are you sure you want to delete process {name}?',
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            if self.sheriff.delete_process(name):
+                self.statusBar().showMessage(f'Successfully deleted process {name}')
+            else:
+                QMessageBox.warning(
+                    self, 'Error',
+                    f'Failed to delete process {name}'
+                )
     
     def load_config(self):
         """Load configuration from a JSON file."""
@@ -190,13 +218,18 @@ class SheriffGUI(QMainWindow):
                     f'Failed to load config: {str(e)}'
                 )
     
-    def save_config(self):
+    def save_config(self, force_dialog: bool = False):
         """Save configuration to a JSON file."""
-        if not self.current_config_file:
-            self.current_config_file, _ = QFileDialog.getSaveFileName(
+        if force_dialog or not self.current_config_file:
+            file_name, _ = QFileDialog.getSaveFileName(
                 self, 'Save Config File',
-                '', 'JSON Files (*.json)'
+                self.current_config_file or '',
+                'JSON Files (*.json)'
             )
+            if file_name:
+                self.current_config_file = file_name
+            else:
+                return
         
         if self.current_config_file:
             if self.sheriff.save_config(self.current_config_file):
@@ -266,6 +299,16 @@ class SheriffGUI(QMainWindow):
             self.deputy_table.setItem(
                 i, 4, QTableWidgetItem(f'{deputy.get("memory_percent", 0):.1f}')
             )
+        
+        # Adjust row heights and column widths
+        self.deputy_table.resizeColumnsToContents()
+        self.deputy_table.resizeRowsToContents()
+        
+        # Set fixed height to match content
+        total_height = self.deputy_table.horizontalHeader().height()
+        for i in range(self.deputy_table.rowCount()):
+            total_height += self.deputy_table.rowHeight(i)
+        self.deputy_table.setFixedHeight(total_height + 2)  # +2 for borders
     
     def update_process_table(self):
         """Update the process table with current information."""
@@ -308,9 +351,12 @@ class SheriffGUI(QMainWindow):
             self.process_table.setItem(
                 i, 6, QTableWidgetItem(uptime)
             )
+            # Auto-Restart
+            auto_restart_item = QTableWidgetItem('Yes' if process.auto_restart else 'No')
+            self.process_table.setItem(i, 7, auto_restart_item)
             # Actions
             self.process_table.setCellWidget(
-                i, 7, self.create_action_button(process)
+                i, 8, self.create_action_button(process)
             )
     
     def update_tables(self):

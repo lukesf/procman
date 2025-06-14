@@ -182,6 +182,30 @@ def monitor(refresh_rate: float):
         sheriff_cli.sheriff.stop_update_thread()
 
 
+@cli.command()
+def status():
+    """Show status of all deputies and processes."""
+    sheriff_cli = SheriffCLI()
+    
+    # Get deputy status
+    deputies = sheriff_cli.sheriff.get_deputy_status()
+    for deputy in deputies:
+        status_color = "green" if deputy["status"] == "healthy" else "red"
+        click.echo(f"Deputy {deputy['hostname']} ({deputy['url']}): {deputy['status']}")
+    
+    # Get process status
+    processes = sheriff_cli.sheriff.get_all_processes()
+    for process in processes:
+        status_color = {
+            "running": "green",
+            "stopped": "red",
+            "died": "red",
+        }.get(process.status, "yellow")
+        click.echo(f"Process {process.name} ({process.host}): {process.status}")
+    
+    return True
+
+
 def main():
     """Start the Sheriff CLI application."""
     cli() 

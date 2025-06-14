@@ -27,7 +27,8 @@ class Sheriff:
             logger.info(f"Attempting to add deputy at {url}")
             response = requests.get(f"{url}/health")
             if response.status_code == 200:
-                hostname = response.json()["hostname"]
+                data = response.json()
+                hostname = data.get("hostname", "localhost")  # Default to localhost if hostname not provided
                 self.deputies[hostname] = url
                 logger.info(f"Successfully added deputy {hostname} at {url}")
                 return True
@@ -51,10 +52,48 @@ class Sheriff:
         logger.warning(f"Deputy {hostname} not found")
         return False
     
+    def update_process(self, name: str, new_info: ProcessInfo) -> bool:
+        """Update an existing process with new information."""
+        if name not in self.processes:
+            logger.error(f"Process {name} not found")
+            return False
+            
+        if new_info.host not in self.deputies:
+            logger.error(f"No deputy found for host {new_info.host}")
+            return False
+            
+        try:
+            url = self.deputies[new_info.host]
+            response = requests.post(
+                f"{url}/process/update/{name}",
+                json=new_info.to_dict()
+            )
+            if response.status_code == 200:
+                # Update local tracking
+                self.processes[name] = new_info
+                logger.info(f"Updated process {name}")
+                return True
+            else:
+                logger.error(f"Failed to update process {name}, status code: {response.status_code}")
+                return False
+                
+        except requests.RequestException as e:
+            logger.error(f"Failed to update process {name}: {str(e)}")
+            return False
+    
     def start_process(self, process_info: ProcessInfo) -> bool:
-        """Start a process on a Deputy."""
+        """Start a process on its assigned deputy."""
+        if process_info.name in self.processes:
+            # If process exists, update its info first
+            if not self.update_process(process_info.name, process_info):
+                return False
+        else:
+            # Add new process to tracking
+            self.processes[process_info.name] = process_info
+            
         if process_info.host not in self.deputies:
             logger.error(f"No deputy found for host {process_info.host}")
+            process_info.status = "deputy not found"
             return False
             
         try:
@@ -64,14 +103,16 @@ class Sheriff:
                 json=process_info.to_dict()
             )
             if response.status_code == 200:
-                self.processes[process_info.name] = process_info
-                logger.info(f"Started process {process_info.name} on {process_info.host}")
+                logger.info(f"Started process {process_info.name}")
                 return True
             else:
                 logger.error(f"Failed to start process {process_info.name}, status code: {response.status_code}")
+                return False
+                
         except requests.RequestException as e:
             logger.error(f"Failed to start process {process_info.name}: {str(e)}")
-        return False
+            process_info.status = "deputy not responding"
+            return False
     
     def stop_process(self, name: str) -> bool:
         """Stop a process on a Deputy."""
@@ -162,17 +203,36 @@ class Sheriff:
             try:
                 response = requests.get(f"{url}/health")
                 if response.status_code == 200:
+                    data = response.json()
                     status = "healthy"
+                    status_list.append({
+                        "hostname": hostname,
+                        "url": url,
+                        "status": status,
+                        "cpu_percent": data.get("cpu_percent", 0.0),
+                        "memory_percent": data.get("memory_percent", 0.0),
+                        "disk_percent": data.get("disk_percent", 0.0)
+                    })
                 else:
                     status = f"unhealthy (status: {response.status_code})"
+                    status_list.append({
+                        "hostname": hostname,
+                        "url": url,
+                        "status": status,
+                        "cpu_percent": 0.0,
+                        "memory_percent": 0.0,
+                        "disk_percent": 0.0
+                    })
             except requests.RequestException as e:
                 status = f"unreachable ({str(e)})"
-            
-            status_list.append({
-                "hostname": hostname,
-                "url": url,
-                "status": status
-            })
+                status_list.append({
+                    "hostname": hostname,
+                    "url": url,
+                    "status": status,
+                    "cpu_percent": 0.0,
+                    "memory_percent": 0.0,
+                    "disk_percent": 0.0
+                })
         return status_list
     
     def load_config(self, config_file: str) -> None:
@@ -234,17 +294,15 @@ class Sheriff:
             
         try:
             url = self.deputies[process.host]
-            # First stop the process if it's running
-            if process.status == "running":
-                response = requests.post(f"{url}/process/stop/{name}")
-                if response.status_code != 200:
-                    logger.error(f"Failed to stop process {name}, status code: {response.status_code}")
-                    return False
-            
-            # Remove from local tracking
-            del self.processes[name]
-            logger.info(f"Deleted process {name}")
-            return True
+            response = requests.post(f"{url}/process/delete/{name}")
+            if response.status_code == 200:
+                # Remove from local tracking
+                del self.processes[name]
+                logger.info(f"Deleted process {name}")
+                return True
+            else:
+                logger.error(f"Failed to delete process {name}, status code: {response.status_code}")
+                return False
             
         except requests.RequestException as e:
             logger.error(f"Failed to delete process {name}: {str(e)}")
@@ -261,7 +319,8 @@ class Sheriff:
                         "command": p.command,
                         "working_dir": p.working_dir,
                         "host": p.host,
-                        "autostart": p.autostart
+                        "autostart": p.autostart,
+                        "auto_restart": p.auto_restart
                     }
                     for p in self.processes.values()
                 ]
