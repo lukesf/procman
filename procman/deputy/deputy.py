@@ -2,8 +2,18 @@ from fastapi import FastAPI, HTTPException
 from typing import List, Dict, Any
 import uvicorn
 import socket
+import psutil
+import threading
+import queue
+import select
+import subprocess
+import time
+import logging
 from ..common.process_manager import ProcessManager
 from ..common.process_info import ProcessInfo
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 deputy: 'Deputy' = None
@@ -17,18 +27,119 @@ class Deputy(ProcessManager):
         self.host = host
         self.port = port
         self.hostname = socket.gethostname()
+        self._output_threads: Dict[str, threading.Thread] = {}
+        self._output_queues: Dict[str, queue.Queue] = {}
     
     def start(self):
         """Start the Deputy server."""
         global deputy
         deputy = self
+        # Initialize process handles for any existing processes
+        for process in self.processes.values():
+            if process.status == "running" and process.pid:
+                try:
+                    self._process_handles[process.name] = psutil.Process(process.pid)
+                except psutil.NoSuchProcess:
+                    process.status = "stopped"
+                    process.pid = None
+        
+        # Start the FastAPI server
         uvicorn.run(app, host=self.host, port=self.port)
+    
+    def start_process(self, process_info: ProcessInfo) -> bool:
+        """Start a process."""
+        if process_info.name in self._process_handles and self._process_handles[process_info.name].poll() is None:
+            return False
+            
+        try:
+            process = subprocess.Popen(
+                process_info.command.split(),
+                cwd=process_info.working_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                start_new_session=True,
+                bufsize=1,
+                universal_newlines=True
+            )
+            
+            process_info.pid = process.pid
+            process_info.status = "running"
+            process_info.start_time = time.time()
+            
+            self._process_handles[process_info.name] = process
+            self.processes[process_info.name] = process_info
+            
+            # Start output capture thread
+            self._output_queues[process_info.name] = queue.Queue()
+            thread = threading.Thread(
+                target=self._capture_output,
+                args=(process_info.name, process),
+                daemon=True
+            )
+            thread.start()
+            self._output_threads[process_info.name] = thread
+            
+            return True
+            
+        except Exception as e:
+            process_info.status = f"error: {str(e)}"
+            return False
+    
+    def stop_process(self, name: str) -> bool:
+        """Stop a process."""
+        success = super().stop_process(name)
+        if success:
+            # Clean up output capture
+            if name in self._output_threads:
+                self._output_threads[name].join(timeout=1)
+                del self._output_threads[name]
+            if name in self._output_queues:
+                del self._output_queues[name]
+        return success
+    
+    def _capture_output(self, name: str, process: subprocess.Popen) -> None:
+        """Capture process output in a separate thread."""
+        while True:
+            # Use select to avoid blocking
+            reads = [process.stdout, process.stderr]
+            ready, _, _ = select.select(reads, [], [], 0.1)
+            
+            for fd in ready:
+                line = fd.readline()
+                if line:
+                    if fd == process.stdout:
+                        self.processes[name].add_output(stdout=line.strip())
+                    else:
+                        self.processes[name].add_output(stderr=line.strip())
+            
+            # Check if process has ended
+            if process.poll() is not None:
+                # Read any remaining output
+                stdout, stderr = process.communicate()
+                if stdout:
+                    self.processes[name].add_output(stdout=stdout.strip())
+                if stderr:
+                    self.processes[name].add_output(stderr=stderr.strip())
+                break
+    
+    def get_system_stats(self) -> Dict[str, float]:
+        """Get system statistics."""
+        return {
+            "cpu_percent": psutil.cpu_percent(interval=0.1),
+            "memory_percent": psutil.virtual_memory().percent,
+            "disk_percent": psutil.disk_usage('/').percent
+        }
 
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "healthy", "hostname": deputy.hostname}
+    stats = deputy.get_system_stats()
+    return {
+        "status": "healthy",
+        "hostname": deputy.hostname,
+        **stats
+    }
 
 
 @app.post("/process/start")
@@ -79,8 +190,9 @@ async def get_all_processes():
 
 def main(host: str = "0.0.0.0", port: int = 8000):
     """Start the Deputy process manager."""
-    deputy_server = Deputy(host=host, port=port)
-    deputy_server.start()
+    global deputy
+    deputy = Deputy(host=host, port=port)
+    deputy.start()
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
-from dataclasses import dataclass
-from typing import Optional, Dict, Any
+from dataclasses import dataclass, field
+from typing import Optional, Dict, Any, List, Deque
+from collections import deque
 import time
 
 
@@ -16,6 +17,10 @@ class ProcessInfo:
     status: str = "stopped"
     start_time: Optional[float] = None
     host: str = "localhost"
+    stdout_buffer: Deque[str] = field(default_factory=lambda: deque(maxlen=1000))
+    stderr_buffer: Deque[str] = field(default_factory=lambda: deque(maxlen=1000))
+    last_stdout_pos: int = field(default=0)
+    last_stderr_pos: int = field(default=0)
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert ProcessInfo to dictionary."""
@@ -30,13 +35,17 @@ class ProcessInfo:
             "status": self.status,
             "start_time": self.start_time,
             "host": self.host,
-            "uptime": time.time() - (self.start_time or time.time()) if self.start_time else 0
+            "uptime": time.time() - (self.start_time or time.time()) if self.start_time else 0,
+            "stdout": list(self.stdout_buffer),
+            "stderr": list(self.stderr_buffer),
+            "last_stdout_pos": self.last_stdout_pos,
+            "last_stderr_pos": self.last_stderr_pos
         }
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'ProcessInfo':
         """Create ProcessInfo from dictionary."""
-        return cls(
+        proc = cls(
             name=data["name"],
             command=data["command"],
             working_dir=data["working_dir"],
@@ -47,4 +56,21 @@ class ProcessInfo:
             status=data.get("status", "stopped"),
             start_time=data.get("start_time"),
             host=data.get("host", "localhost")
-        ) 
+        )
+        
+        # Add output buffers if present
+        if "stdout" in data:
+            proc.stdout_buffer.extend(data["stdout"])
+        if "stderr" in data:
+            proc.stderr_buffer.extend(data["stderr"])
+        proc.last_stdout_pos = data.get("last_stdout_pos", 0)
+        proc.last_stderr_pos = data.get("last_stderr_pos", 0)
+        
+        return proc
+    
+    def add_output(self, stdout: Optional[str] = None, stderr: Optional[str] = None) -> None:
+        """Add output to the buffers."""
+        if stdout:
+            self.stdout_buffer.append(stdout)
+        if stderr:
+            self.stderr_buffer.append(stderr) 

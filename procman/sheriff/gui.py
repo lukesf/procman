@@ -1,13 +1,14 @@
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QTableWidget, QTableWidgetItem, QLabel, QInputDialog,
-    QFileDialog, QMessageBox, QGroupBox
+    QFileDialog, QMessageBox, QGroupBox, QMenu
 )
 from PyQt5.QtCore import QTimer, Qt
 from typing import Optional
 import sys
 from .sheriff import Sheriff
 from ..common.process_info import ProcessInfo
+from .process_dialog import ProcessDialog
 
 
 class SheriffGUI(QMainWindow):
@@ -16,6 +17,7 @@ class SheriffGUI(QMainWindow):
     def __init__(self):
         super().__init__()
         self.sheriff = Sheriff()
+        self.current_config_file = None
         self.init_ui()
         self.start_update_timer()
     
@@ -37,10 +39,20 @@ class SheriffGUI(QMainWindow):
         add_deputy_btn.clicked.connect(self.add_deputy)
         toolbar.addWidget(add_deputy_btn)
         
+        # Add Process button
+        add_process_btn = QPushButton('Add Process')
+        add_process_btn.clicked.connect(self.add_process)
+        toolbar.addWidget(add_process_btn)
+        
         # Load Config button
         load_config_btn = QPushButton('Load Config')
         load_config_btn.clicked.connect(self.load_config)
         toolbar.addWidget(load_config_btn)
+        
+        # Save Config button
+        save_config_btn = QPushButton('Save Config')
+        save_config_btn.clicked.connect(self.save_config)
+        toolbar.addWidget(save_config_btn)
         
         # Add stretch to push buttons to the left
         toolbar.addStretch()
@@ -53,9 +65,9 @@ class SheriffGUI(QMainWindow):
         
         # Create deputy table
         self.deputy_table = QTableWidget()
-        self.deputy_table.setColumnCount(3)
+        self.deputy_table.setColumnCount(5)
         self.deputy_table.setHorizontalHeaderLabels([
-            'Hostname', 'URL', 'Status'
+            'Hostname', 'URL', 'Status', 'CPU %', 'Memory %'
         ])
         self.deputy_table.horizontalHeader().setStretchLastSection(True)
         deputy_layout.addWidget(self.deputy_table)
@@ -75,6 +87,8 @@ class SheriffGUI(QMainWindow):
             'Uptime', 'Actions'
         ])
         self.process_table.horizontalHeader().setStretchLastSection(True)
+        self.process_table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.process_table.customContextMenuRequested.connect(self.show_process_context_menu)
         process_layout.addWidget(self.process_table)
         
         process_group.setLayout(process_layout)
@@ -105,6 +119,60 @@ class SheriffGUI(QMainWindow):
                     f'Failed to add Deputy at {url}'
                 )
     
+    def add_process(self):
+        """Add a new process."""
+        dialog = ProcessDialog(parent=self)
+        if dialog.exec_() == QDialog.Accepted:
+            process_info = dialog.get_process_info()
+            if self.sheriff.start_process(process_info):
+                self.statusBar().showMessage(f'Successfully added process {process_info.name}')
+            else:
+                QMessageBox.warning(
+                    self, 'Error',
+                    f'Failed to add process {process_info.name}'
+                )
+    
+    def edit_process(self, name: str):
+        """Edit an existing process."""
+        process = self.sheriff.get_process_info(name)
+        if not process:
+            return
+            
+        dialog = ProcessDialog(process, parent=self)
+        result = dialog.exec_()
+        
+        if result == QDialog.Accepted:
+            # Update process
+            new_info = dialog.get_process_info()
+            # Stop the old process
+            self.sheriff.stop_process(name)
+            # Start with new settings
+            if self.sheriff.start_process(new_info):
+                self.statusBar().showMessage(f'Successfully updated process {name}')
+            else:
+                QMessageBox.warning(
+                    self, 'Error',
+                    f'Failed to update process {name}'
+                )
+        elif result == 2:  # Delete
+            if self.sheriff.delete_process(name):
+                self.statusBar().showMessage(f'Successfully deleted process {name}')
+            else:
+                QMessageBox.warning(
+                    self, 'Error',
+                    f'Failed to delete process {name}'
+                )
+    
+    def show_process_context_menu(self, pos):
+        """Show context menu for process table."""
+        row = self.process_table.rowAt(pos.y())
+        if row >= 0:
+            name = self.process_table.item(row, 0).text()
+            menu = QMenu(self)
+            edit_action = menu.addAction("Edit")
+            edit_action.triggered.connect(lambda: self.edit_process(name))
+            menu.exec_(self.process_table.viewport().mapToGlobal(pos))
+    
     def load_config(self):
         """Load configuration from a JSON file."""
         file_name, _ = QFileDialog.getOpenFileName(
@@ -114,11 +182,29 @@ class SheriffGUI(QMainWindow):
         if file_name:
             try:
                 self.sheriff.load_config(file_name)
+                self.current_config_file = file_name
                 self.statusBar().showMessage(f'Loaded config from {file_name}')
             except Exception as e:
                 QMessageBox.warning(
                     self, 'Error',
                     f'Failed to load config: {str(e)}'
+                )
+    
+    def save_config(self):
+        """Save configuration to a JSON file."""
+        if not self.current_config_file:
+            self.current_config_file, _ = QFileDialog.getSaveFileName(
+                self, 'Save Config File',
+                '', 'JSON Files (*.json)'
+            )
+        
+        if self.current_config_file:
+            if self.sheriff.save_config(self.current_config_file):
+                self.statusBar().showMessage(f'Saved config to {self.current_config_file}')
+            else:
+                QMessageBox.warning(
+                    self, 'Error',
+                    f'Failed to save config'
                 )
     
     def create_action_button(self, process: ProcessInfo) -> QWidget:
@@ -172,6 +258,14 @@ class SheriffGUI(QMainWindow):
             else:
                 status_item.setForeground(Qt.red)
             self.deputy_table.setItem(i, 2, status_item)
+            # CPU %
+            self.deputy_table.setItem(
+                i, 3, QTableWidgetItem(f'{deputy.get("cpu_percent", 0):.1f}')
+            )
+            # Memory %
+            self.deputy_table.setItem(
+                i, 4, QTableWidgetItem(f'{deputy.get("memory_percent", 0):.1f}')
+            )
     
     def update_process_table(self):
         """Update the process table with current information."""

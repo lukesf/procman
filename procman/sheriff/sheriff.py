@@ -4,6 +4,7 @@ import time
 import threading
 import logging
 from ..common.process_info import ProcessInfo
+import json
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -176,7 +177,6 @@ class Sheriff:
     
     def load_config(self, config_file: str) -> None:
         """Load process configuration from a JSON file."""
-        import json
         logger.info(f"Loading config from {config_file}")
         try:
             with open(config_file, 'r') as f:
@@ -219,4 +219,60 @@ class Sheriff:
         if self._update_thread:
             self._should_stop = True
             self._update_thread.join()
-            self._update_thread = None 
+            self._update_thread = None
+    
+    def delete_process(self, name: str) -> bool:
+        """Delete a process."""
+        if name not in self.processes:
+            logger.error(f"Process {name} not found")
+            return False
+            
+        process = self.processes[name]
+        if process.host not in self.deputies:
+            logger.error(f"No deputy found for host {process.host}")
+            return False
+            
+        try:
+            url = self.deputies[process.host]
+            # First stop the process if it's running
+            if process.status == "running":
+                response = requests.post(f"{url}/process/stop/{name}")
+                if response.status_code != 200:
+                    logger.error(f"Failed to stop process {name}, status code: {response.status_code}")
+                    return False
+            
+            # Remove from local tracking
+            del self.processes[name]
+            logger.info(f"Deleted process {name}")
+            return True
+            
+        except requests.RequestException as e:
+            logger.error(f"Failed to delete process {name}: {str(e)}")
+            return False
+    
+    def save_config(self, config_file: str) -> bool:
+        """Save current configuration to a JSON file."""
+        try:
+            config = {
+                "deputies": [url for url in self.deputies.values()],
+                "processes": [
+                    {
+                        "name": p.name,
+                        "command": p.command,
+                        "working_dir": p.working_dir,
+                        "host": p.host,
+                        "autostart": p.autostart
+                    }
+                    for p in self.processes.values()
+                ]
+            }
+            
+            with open(config_file, 'w') as f:
+                json.dump(config, f, indent=4)
+            
+            logger.info(f"Saved config to {config_file}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to save config: {str(e)}")
+            return False 

@@ -1,7 +1,6 @@
 {
     "deputies": [
-        "http://localhost:8000",
-        "http://localhost:8001"
+        "http://localhost:8000"
     ],
     "processes": [
         {
@@ -12,18 +11,11 @@
             "autostart": true
         },
         {
-          "name": "run",
-          "command": "sh -c 'sleep 10 && echo \"done\"'",
-          "working_dir": "/tmp",
-          "host": "k9.lan",
-          "autostart": true
-        },
-        {
-            "name": "redis_server",
-            "command": "redis-server",
+            "name": "run",
+            "command": "sh -c 'sleep 10 && echo \"done\"'",
             "working_dir": "/tmp",
-            "host": "localhost",
+            "host": "k9.lan",
             "autostart": true
         }
     ]
-} 
+}
