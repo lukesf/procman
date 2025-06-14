@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QTableWidget, QTableWidgetItem, QLabel, QInputDialog,
-    QFileDialog, QMessageBox, QGroupBox, QMenu
+    QFileDialog, QMessageBox, QGroupBox, QMenu, QDialog
 )
 from PyQt5.QtCore import QTimer, Qt
 from typing import Optional
@@ -65,9 +65,9 @@ class SheriffGUI(QMainWindow):
         
         # Create deputy table
         self.deputy_table = QTableWidget()
-        self.deputy_table.setColumnCount(5)
+        self.deputy_table.setColumnCount(6)
         self.deputy_table.setHorizontalHeaderLabels([
-            'Hostname', 'URL', 'Status', 'CPU %', 'Memory %'
+            'Hostname', 'URL', 'Status', 'CPU %', 'Memory %', 'Disk %'
         ])
         self.deputy_table.horizontalHeader().setStretchLastSection(True)
         self.deputy_table.setSizeAdjustPolicy(QTableWidget.AdjustToContents)
@@ -299,7 +299,10 @@ class SheriffGUI(QMainWindow):
             self.deputy_table.setItem(
                 i, 4, QTableWidgetItem(f'{deputy.get("memory_percent", 0):.1f}')
             )
-        
+            # Disk %
+            self.deputy_table.setItem(
+                i, 5, QTableWidgetItem(f'{deputy.get("disk_percent", 0):.1f}')
+            )
         # Adjust row heights and column widths
         self.deputy_table.resizeColumnsToContents()
         self.deputy_table.resizeRowsToContents()

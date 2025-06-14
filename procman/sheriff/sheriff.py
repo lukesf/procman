@@ -80,7 +80,40 @@ class Sheriff:
         except requests.RequestException as e:
             logger.error(f"Failed to update process {name}: {str(e)}")
             return False
-    
+        
+    def add_process(self, process_info: ProcessInfo) -> bool:
+        """Add a process on its assigned deputy."""
+        if process_info.name in self.processes:
+            # If process exists, update its info first
+            if not self.update_process(process_info.name, process_info):
+                return False
+        else:
+            # Add new process to tracking
+            self.processes[process_info.name] = process_info
+            
+        if process_info.host not in self.deputies:
+            logger.error(f"No deputy found for host {process_info.host}")
+            process_info.status = "deputy not found"
+            return False
+            
+        try:
+            url = self.deputies[process_info.host]
+            response = requests.post(
+                f"{url}/process/add",
+                json=process_info.to_dict()
+            )
+            if response.status_code == 200:
+                logger.info(f"Added process {process_info.name}")
+                return True
+            else:
+                logger.error(f"Failed to add process {process_info.name}, status code: {response.status_code}")
+                return False
+                
+        except requests.RequestException as e:
+            logger.error(f"Failed to add process {process_info.name}: {str(e)}")
+            process_info.status = "deputy not responding"
+            return False
+
     def start_process(self, process_info: ProcessInfo) -> bool:
         """Start a process on its assigned deputy."""
         if process_info.name in self.processes:
@@ -251,8 +284,11 @@ class Sheriff:
             for proc_config in config.get("processes", []):
                 logger.info(f"Adding process from config: {proc_config}")
                 process_info = ProcessInfo.from_dict(proc_config)
-                if process_info.host in self.deputies and process_info.autostart:
-                    self.start_process(process_info)
+                if process_info.host in self.deputies:
+                    if process_info.autostart:
+                        self.start_process(process_info)
+                    else:
+                        self.add_process(process_info)
                 else:
                     logger.warning(f"Skipping process {process_info.name}: deputy {process_info.host} not found")
         except FileNotFoundError:

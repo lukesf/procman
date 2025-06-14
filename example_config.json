@@ -18,6 +18,14 @@
             "host": "k9.lan",
             "autostart": false,
             "auto_restart": false
+        },
+        {
+            "name": "glx",
+            "command": "glxgears",
+            "working_dir": "/tmp",
+            "host": "k9.lan",
+            "autostart": false,
+            "auto_restart": false
         }
     ]
 }

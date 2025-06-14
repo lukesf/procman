@@ -209,23 +209,25 @@ class Deputy(ProcessManager):
 
     def delete_process(self, name: str) -> bool:
         """Delete a process."""
-        if name not in self._process_handles:
+        if name not in self.processes:
             logger.error(f"Process {name} not found")
             return False
             
         # Stop the process if it's running
-        if self._process_handles[name].poll() is None:
-            self.stop_process(name)
-            
+        if name in self._process_handles:
+            was_running = self._process_handles[name].poll() is None
+            if was_running:
+                self.stop_process(name)
+            del self._process_handles[name]
         # Remove from tracking
-        del self._process_handles[name]
-        del self._process_info[name]
+        del self.processes[name]
+        
         logger.info(f"Deleted process {name}")
         return True
         
     def update_process(self, name: str, process_info: ProcessInfo) -> bool:
         """Update a process configuration."""
-        if name not in self._process_info:
+        if name not in self.processes:
             logger.error(f"Process {name} not found")
             return False
             
@@ -233,7 +235,7 @@ class Deputy(ProcessManager):
         was_running = self._process_handles[name].poll() is None if name in self._process_handles else False
         
         # Update process info
-        self._process_info[name] = process_info
+        self.processes[name] = process_info
         
         # Restart if it was running
         if was_running:
@@ -252,14 +254,17 @@ async def health_check():
     }
 
 
+@app.post("/process/add")
+async def add_process(process_info: Dict[str, Any]):
+    """Add a process without starting it."""
+    proc_info = ProcessInfo.from_dict(process_info)
+    deputy.processes[proc_info.name] = proc_info
+    return {"status": "success"}
+
 @app.post("/process/start")
 async def start_process(process_info: Dict[str, Any]):
     """Start a process."""
     proc_info = ProcessInfo.from_dict(process_info)
-    if not proc_info.autostart:
-        # Just add the process without starting it
-        deputy.processes[proc_info.name] = proc_info
-        return {"status": "success"}
     success = deputy.start_process(proc_info)
     if not success:
         raise HTTPException(status_code=400, detail=f"Failed to start process {proc_info.name}")
@@ -319,15 +324,6 @@ async def update_process(name: str, process_info: Dict[str, Any]):
     if not success:
         raise HTTPException(status_code=400, detail=f"Failed to update process {name}")
     return {"status": "success"}
-
-
-@app.post("/process/add")
-async def add_process(process_info: Dict[str, Any]):
-    """Add a process without starting it."""
-    proc_info = ProcessInfo.from_dict(process_info)
-    deputy.processes[proc_info.name] = proc_info
-    return {"status": "success"}
-
 
 def main(host: str = "0.0.0.0", port: int = 8000):
     """Start the Deputy process manager."""

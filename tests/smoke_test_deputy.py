@@ -56,8 +56,8 @@ class DeputySmokeTest:
         
         # 1. Add a stopped process
         process_info = {
-            "name": "test-counter",
-            "command": "echo 'test output'",
+            "name": "testcounter",
+            "command": "while true; do echo 'test output'; sleep 1; done",
             "working_dir": "/tmp",
             "host": "localhost",
             "autostart": False,
@@ -81,7 +81,7 @@ class DeputySmokeTest:
             return False
         
         processes = response.json()
-        if not any(p["name"] == "test-counter" and p["status"] == "stopped" for p in processes):
+        if not any(p["name"] == "testcounter" and p["status"] == "stopped" for p in processes):
             print("ERROR: Process not found or not in stopped state")
             return False
         print("Successfully verified process is stopped")
@@ -105,7 +105,7 @@ class DeputySmokeTest:
                 return False
             
             processes = response.json()
-            process = next((p for p in processes if p["name"] == "test-counter"), None)
+            process = next((p for p in processes if p["name"] == "testcounter"), None)
             if process and process["status"] == "running" and process.get("stdout"):
                 print(f"Got output after {attempt + 1} seconds")
                 break
@@ -117,7 +117,7 @@ class DeputySmokeTest:
         
         # 5. Stop the process
         print("Stopping process...")
-        response = requests.post(f"{self.deputy_url}/process/stop/test-counter")
+        response = requests.post(f"{self.deputy_url}/process/stop/testcounter")
         if response.status_code != 200:
             print("ERROR: Failed to stop process")
             return False
@@ -127,7 +127,7 @@ class DeputySmokeTest:
         print("Modifying process command...")
         process_info["command"] = "sh -c 'echo modified; sleep 2'"
         response = requests.post(
-            f"{self.deputy_url}/process/update/test-counter",
+            f"{self.deputy_url}/process/update/testcounter",
             json=process_info
         )
         if response.status_code != 200:
@@ -151,7 +151,7 @@ class DeputySmokeTest:
             return False
         
         processes = response.json()
-        process = next((p for p in processes if p["name"] == "test-counter"), None)
+        process = next((p for p in processes if p["name"] == "testcounter"), None)
         if not process or "modified" not in str(process.get("stdout", [])):
             print("ERROR: Modified process output not found")
             return False
@@ -159,7 +159,7 @@ class DeputySmokeTest:
         
         # 7. Delete the process
         print("Deleting process...")
-        response = requests.post(f"{self.deputy_url}/process/delete/test-counter")
+        response = requests.post(f"{self.deputy_url}/process/delete/testcounter")
         if response.status_code != 200:
             print("ERROR: Failed to delete process")
             return False
@@ -172,7 +172,7 @@ class DeputySmokeTest:
             return False
         
         processes = response.json()
-        if any(p["name"] == "test-counter" for p in processes):
+        if any(p["name"] == "testcounter" for p in processes):
             print("ERROR: Process still exists after deletion")
             return False
         print("Successfully verified process deletion")

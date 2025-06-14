@@ -1,8 +1,6 @@
 # Process Manager (ProcMan)
 
-A distributed process management system consisting of a central Sheriff process manager and distributed Deputy process managers.
-
-## Components
+A distributed process management system consisting of a central Sheriff process manager and distributed Deputy process managers. Inspired by [MIT DGC procman/libbot2-procman](https://github.com/libbot2/libbot2/tree/master/bot2-procman), this Python implementation provides both GUI and CLI interfaces.
 
 ### Sheriff
 The Sheriff is the central process manager that:
@@ -37,28 +35,41 @@ pip install -r requirements.txt
 ### Starting the Sheriff
 ```bash
 # GUI mode
-python sheriff.py --gui
+python3 -m procman sheriff gui
 
 # CLI mode
-python sheriff.py --cli
+python3 -m procman sheriff cli
 ```
 
 ### Starting a Deputy
 ```bash
-python deputy.py --host <sheriff_host> --port <sheriff_port>
+python3 -m procman deputy --host <deputy_host> --port <deputy_port>
 ```
 
 ## Configuration
 Process configurations are stored in JSON format. Example:
 ```json
 {
-  "processes": [
-    {
-      "name": "web_server",
-      "command": "python -m http.server 8000",
-      "working_dir": "/path/to/web/files",
-      "autostart": true
-    }
-  ]
+    "deputies": [
+        "http://localhost:8000"
+    ],
+    "processes": [
+        {
+            "name": "echoloop",
+            "command": "sh -c 'while true; do echo \"hello\"; sleep 1; done'",
+            "working_dir": "/tmp",
+            "host": "k9.lan",
+            "autostart": true,
+            "auto_restart": false
+        },
+        {
+            "name": "dateprinter",
+            "command": "sh -c 'while true; do date; sleep 5; done'",
+            "working_dir": "/tmp",
+            "host": "k9.lan",
+            "autostart": false,
+            "auto_restart": false
+        }
+    ]
 }
 ```
