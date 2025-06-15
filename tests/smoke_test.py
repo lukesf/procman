@@ -38,7 +38,7 @@ class SmokeTest:
                     "auto_restart": False
                 },
                 {
-                    "name": "auto-restart-test",
+                    "name": "autorestart",
                     "command": "sh -c 'echo starting; sleep 2; echo failing; exit 1'",
                     "working_dir": "/tmp",
                     "host": "localhost",
@@ -139,7 +139,7 @@ class SmokeTest:
             
             # Start Sheriff with config
             self.start_sheriff()
-            time.sleep(10)  # Wait longer for processes to start and run
+            time.sleep(3)  # Wait longer for processes to start and run
             
             # Check counter process output
             if not self.check_process_output("counter", ["1", "2", "3"]):
@@ -147,7 +147,7 @@ class SmokeTest:
                 return False
             
             # Check auto-restart process
-            if not self.check_process_output("auto-restart-test", ["starting", "failing"]):
+            if not self.check_process_output("autorestart", ["starting", "failing"]):
                 print("ERROR: Auto-restart process output not as expected")
                 return False
             

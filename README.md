@@ -1,6 +1,6 @@
 # Process Manager (ProcMan)
 
-A distributed process management system consisting of a central Sheriff process manager and distributed Deputy process managers. Inspired by [MIT DGC procman/libbot2-procman](https://github.com/libbot2/libbot2/tree/master/bot2-procman), this Python implementation provides both GUI and CLI interfaces.
+A distributed process management system consisting of a central Sheriff process manager and distributed Deputy process managers. Inspired by [MIT DGC procman/libbot2-procman](https://github.com/libbot2/libbot2/tree/master/bot2-procman), this vibe coded Python implementation provides both GUI and CLI interfaces without many dependencies.
 
 ### Sheriff
 The Sheriff is the central process manager that:
@@ -73,3 +73,19 @@ Process configurations are stored in JSON format. Example:
     ]
 }
 ```
+## Next 
+
+### Todos
+* Security / authentication all the things.
+* Discoverable deputies?
+* Change transport? LCM? 
+* Browser interface? for Sheriff and/or deputies?
+* Process grouping
+* logging log file generation.
+* special case localhost for local hostname?
+
+### Bugs
+* process names with - or _ used in post. remove from post or encapsulate
+* process names have to be unique
+* Reloading config doesn't work if processes exist in deputy already
+

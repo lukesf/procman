@@ -52,28 +52,30 @@ class SheriffCLI:
     def generate_deputy_table(self) -> Table:
         """Generate a rich table with deputy information."""
         table = Table(
-            "Hostname", "URL", "Status",
+            "Hostname", "URL", "Status", "CPU %", "Memory %", "Disk %",
             box=box.ROUNDED,
             title="Deputy Status"
         )
-        
+    
         for deputy in self.sheriff.get_deputy_status():
             status_color = "green" if deputy["status"] == "healthy" else "red"
             table.add_row(
                 deputy["hostname"],
                 deputy["url"],
-                f"[{status_color}]{deputy['status']}[/]"
+                f"[{status_color}]{deputy['status']}[/]",
+                f"{deputy.get('cpu_percent', 0):.1f}",
+                f"{deputy.get('memory_percent', 0):.1f}",
+                f"{deputy.get('disk_percent', 0):.1f}"
             )
         
         return table
     
-    def generate_display(self) -> List[Table]:
+    def generate_display(self) -> Table:
         """Generate all display tables."""
-        return [
-            self.generate_deputy_table(),
-            self.generate_process_table()
-        ]
-
+        t = Table(title="ProcMan Sheriff", box=None)
+        t.add_row(self.generate_deputy_table())
+        t.add_row(self.generate_process_table())
+        return t
 
 @click.group()
 def cli():
@@ -164,9 +166,11 @@ def restart_process(name: str):
 
 @cli.command()
 @click.option('--refresh-rate', default=1.0, help="Refresh rate in seconds")
-def monitor(refresh_rate: float):
+@click.argument('config_file')
+def monitor(config_file: str, refresh_rate: float):
     """Monitor all processes in real-time."""
     sheriff_cli = SheriffCLI()
+    sheriff_cli.sheriff.load_config(config_file)
     sheriff_cli.sheriff.start_update_thread(refresh_rate)
     
     try:
