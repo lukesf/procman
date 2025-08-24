@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Smoke test for procman CLI interface."""
 
+import pytest
 import os
 import sys
 import time
@@ -161,6 +162,8 @@ class CLISmokeTest:
         if os.path.exists(self.config_file):
             os.unlink(self.config_file)
     
+    @pytest.mark.smoke
+    @pytest.mark.cli
     def run(self) -> bool:
         """Run smoke test."""
         try:

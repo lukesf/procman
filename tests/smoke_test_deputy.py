@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Smoke test for Deputy process management."""
 
+import pytest
 import os
 import sys
 import time
@@ -188,6 +189,8 @@ class DeputySmokeTest:
             self.deputy_process.terminate()
             self.deputy_process.wait(timeout=5)
     
+    @pytest.mark.smoke
+    @pytest.mark.deputy
     def run(self) -> bool:
         """Run smoke test."""
         try:

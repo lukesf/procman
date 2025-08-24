@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Smoke test for procman."""
 
+import pytest
 import os
 import sys
 import time
@@ -125,6 +126,8 @@ class SmokeTest:
         if os.path.exists(self.config_file):
             os.unlink(self.config_file)
     
+    @pytest.mark.smoke
+    @pytest.mark.gui
     def run(self) -> bool:
         """Run smoke test."""
         try:
@@ -148,7 +151,6 @@ class SmokeTest:
             
             # Check auto-restart process
             if not self.check_process_output("autorestart", ["starting", "failing"]):
-                print("ERROR: Auto-restart process output not as expected")
                 return False
             
             print("Smoke test passed!")

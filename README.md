@@ -83,6 +83,9 @@ Process configurations are stored in JSON format. Example:
 * Process grouping
 * logging log file generation.
 * special case localhost for local hostname?
+* bound stderr/stdout?
+* add scrollback bars
+* save logs
 
 ### Bugs
 * process names with - or _ used in post. remove from post or encapsulate
