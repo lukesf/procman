@@ -44,27 +44,27 @@ jobs:
       run: |
         python -m pytest tests/ -v --cov=procman --cov-report=xml --cov-report=term-missing -m "not gui"
     
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.xml
-        fail_ci_if_error: false
+#    - name: Upload coverage to Codecov
+#      uses: codecov/codecov-action@v3
+#      with:
+#        file: ./coverage.xml
+#        fail_ci_if_error: false
 
   test-gui:
     runs-on: ubuntu-latest
-    container:
-      image: ubuntu:22.04
+#    container:
+#      image: ubuntu:22.04
     strategy:
       matrix:
-        python-version: ["3.11"]
+        python-version: ["3.9"]
     
     steps:
     - uses: actions/checkout@v4
     
     - name: Install system dependencies
       run: |
-        apt-get update
-        apt-get install -y python3-pip python3-venv python3-pyqt5 python3-pyqt5.qtcore python3-pyqt5.qtgui python3-pyqt5.qtwidgets xvfb
+        sudo apt update
+        sudo apt install -y python3-pip python3-venv xvfb
     
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
