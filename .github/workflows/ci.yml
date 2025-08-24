@@ -7,11 +7,11 @@ on:
     branches: [ main, develop ]
 
 jobs:
-  test:
+  test-coverage:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11"]
+        python-version: ["3.10"]
 
     steps:
     - uses: actions/checkout@v4
