@@ -44,11 +44,11 @@ jobs:
       run: |
         python -m pytest tests/ -v --cov=procman --cov-report=xml --cov-report=term-missing -m "not gui"
     
-#    - name: Upload coverage to Codecov
-#      uses: codecov/codecov-action@v3
-#      with:
-#        file: ./coverage.xml
-#        fail_ci_if_error: false
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: false
 
   test-gui:
     runs-on: ubuntu-latest
