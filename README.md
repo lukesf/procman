@@ -19,6 +19,19 @@ The Deputy is a lightweight process manager that:
 
 ## Installation
 
+### Option 1: DevContainer (Recommended)
+
+For the best development experience, use the included devcontainer:
+
+1. Install [Docker](https://docs.docker.com/get-docker/) and [VS Code](https://code.visualstudio.com/) with the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+2. Open the project in VS Code
+3. Click "Reopen in Container" when prompted
+4. The container will automatically set up Python, PyQt5, and all development tools
+
+See [.devcontainer/README.md](.devcontainer/README.md) for detailed instructions.
+
+### Option 2: Local Installation
+
 1. Create a virtual environment:
 ```bash
 python3 -m venv venv
