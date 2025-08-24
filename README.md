@@ -86,9 +86,11 @@ Process configurations are stored in JSON format. Example:
 * bound stderr/stdout?
 * add scrollback bars
 * save logs
+* check CI
 
 ### Bugs
 * process names with - or _ used in post. remove from post or encapsulate
 * process names have to be unique
 * Reloading config doesn't work if processes exist in deputy already
+* 
 
