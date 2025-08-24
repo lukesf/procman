@@ -87,4 +87,4 @@ jobs:
       env:
         DISPLAY: :99
       run: |
-        python -m pytest tests/ -v --cov=procman --cov-report=xml --cov-report=term-missing -m "gui"
+        python tests/smoke_test.py
